@@ -1,0 +1,172 @@
+[
+ {
+  "id": "INN-01-empty-state-guidance",
+  "idea": "empty-state-guidance(UX)：空状态直接告诉用户下一步做什么",
+  "user_problem": "见约束 C-1",
+  "core_value": "空状态直接告诉用户下一步做什么",
+  "differentiation": "baseline[空数据白屏/空白列表] → 本品[空状态直接告诉用户下一步做什么]",
+  "complexity_cost": "零(无新页面/步骤/设置)",
+  "implementation_cost": "低(载体:scaffold-py)",
+  "risk": "低",
+  "confidence": "high",
+  "decision": "CORE",
+  "reason": "5问全过: 真实问题+明显更好+首屏可感知+零新页面+删除伤核心",
+  "dimension": "UX",
+  "tied_constraints": [
+   "C-1",
+   "C-2"
+  ],
+  "flag": "scaffold-py",
+  "evidence": "V_browser_interact"
+ },
+ {
+  "id": "INN-02-inline-error-hint",
+  "idea": "inline-error-hint(recovery)：原地红色提示，不丢已填内容",
+  "user_problem": "见约束 C-1",
+  "core_value": "原地红色提示，不丢已填内容",
+  "differentiation": "baseline[错输入崩溃或静默失败] → 本品[原地红色提示，不丢已填内容]",
+  "complexity_cost": "零(无新页面/步骤/设置)",
+  "implementation_cost": "低(载体:scaffold-py)",
+  "risk": "低",
+  "confidence": "high",
+  "decision": "CORE",
+  "reason": "5问全过: 真实问题+明显更好+首屏可感知+零新页面+删除伤核心",
+  "dimension": "recovery",
+  "tied_constraints": [
+   "C-1",
+   "C-2"
+  ],
+  "flag": "scaffold-py",
+  "evidence": "journey"
+ },
+ {
+  "id": "INN-03-one-step-add",
+  "idea": "one-step-add(workflow)：首屏单行输入回车即新增",
+  "user_problem": "见约束 C-1",
+  "core_value": "首屏单行输入回车即新增",
+  "differentiation": "baseline[新增需跳页/开弹窗填多表] → 本品[首屏单行输入回车即新增]",
+  "complexity_cost": "零(无新页面/步骤/设置)",
+  "implementation_cost": "低(载体:agent-copy)",
+  "risk": "低",
+  "confidence": "high",
+  "decision": "CORE",
+  "reason": "5问全过: 真实问题+明显更好+首屏可感知+零新页面+删除伤核心",
+  "dimension": "workflow",
+  "tied_constraints": [
+   "C-1",
+   "C-2"
+  ],
+  "flag": "agent-copy",
+  "evidence": "journey"
+ },
+ {
+  "id": "INN-04-stat-count-live",
+  "idea": "stat-count-live(dataviz)：统计区数字与列表实时一致，一眼可信",
+  "user_problem": "见约束 C-1",
+  "core_value": "统计区数字与列表实时一致，一眼可信",
+  "differentiation": "baseline[统计与列表各算各的] → 本品[统计区数字与列表实时一致，一眼可信]",
+  "complexity_cost": "零(无新页面/步骤/设置)",
+  "implementation_cost": "低(载体:agent-copy)",
+  "risk": "低",
+  "confidence": "medium",
+  "decision": "OPTIONAL",
+  "reason": "有价值但删除不伤核心 → 第一版不做, 入路线图",
+  "dimension": "dataviz",
+  "tied_constraints": [
+   "C-1",
+   "C-2"
+  ],
+  "flag": "agent-copy",
+  "evidence": "journey"
+ },
+ {
+  "id": "INN-DESIGN-focused-next",
+  "idea": "focused-next: 未完成项中第一条自动成为今日焦点，置顶展示",
+  "user_problem": "列表越长越不知道从哪开始",
+  "core_value": "启动成本从浏览全表降为跟随焦点",
+  "differentiation": "baseline[自己浏览全表选起点] → 本品[启动步骤 N→1]",
+  "complexity_cost": "低(1个endpoint+首屏1个div, 无新页面/新设置)",
+  "implementation_cost": "低(registry代码片段, builder自动注入)",
+  "risk": "低",
+  "confidence": "low",
+  "decision": "OPTIONAL",
+  "reason": "OPEN_INNOVATION: 需求未命中任何机制域名，注册表仅作参考；focused-next 为兜底参考实现，不默认进第一版",
+  "dimension": "mechanism",
+  "tied_constraints": [
+   "C-1"
+  ],
+  "flag": "innovation_mech:focused-next",
+  "evidence": "INNOVATION_PROBE:focused-next",
+  "mechanism": "focused-next",
+  "core_job": "立刻开始",
+  "design_space": [
+   "baseline(普通CRUD: 列表+增删)",
+   "repertoire-UX(零clutter小改进, 见上)",
+   "mechanism(focused-next: 未完成项中第一条自动成为今日焦点，置顶展示)"
+  ],
+  "ab": {
+   "baseline": {
+    "steps": "翻列表/逐条判断(N步)",
+    "pages": 1,
+    "decision": "用户自己全量决策"
+   },
+   "innovative": {
+    "steps": "看推荐/结论(1步)+执行",
+    "pages": 1,
+    "decision": "系统给决策建议, 用户执行"
+   }
+  },
+  "feasibility": "PARTIAL",
+  "causal": {
+   "user_problem": "列表越长越不知道从哪开始",
+   "insight": "用户需要一个明确的起点，而不是完整列表",
+   "idea": "未完成项中第一条自动成为今日焦点，置顶展示",
+   "behavior_change": "GET /api/next → 首个非done项；完成后焦点自动移到下一条",
+   "user_benefit": "启动成本从浏览全表降为跟随焦点",
+   "implementation": "builder注入 focused-next (endpoint GET /api/next, 见innovation_mech.MECHS[focused-next])",
+   "verification": "增删后焦点变化 + anti-hardcode(多输入输出必不同)"
+  },
+  "journey_slot": "打开→焦点即起点→完成→焦点更新"
+ },
+ {
+  "id": "INN-OPEN-06",
+  "idea": "开放式候选：围绕核心任务减少一步操作/一次决策(待用户确认)",
+  "user_problem": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+  "core_value": "未验证(需用户确认价值)",
+  "differentiation": "未知(相对 baseline 待确认)",
+  "complexity_cost": "未知",
+  "implementation_cost": "未知",
+  "risk": "未知领域，猜测实现易伪创新",
+  "confidence": "low",
+  "decision": "OPTIONAL",
+  "reason": "OPEN: 未知领域只给候选不给结论；用户 YES 后才入 SPEC，否则等同 NO_INNOVATION_NEEDED",
+  "dimension": "open",
+  "tied_constraints": [
+   "C-1"
+  ],
+  "flag": "needs-confirm",
+  "evidence": "NEEDS_REVIEW",
+  "mechanism": null,
+  "core_job": "立刻开始",
+  "design_space": [
+   "baseline(普通CRUD: 列表+增删)",
+   "repertoire-UX(零clutter小改进, 见上)",
+   "mechanism(focused-next: 未完成项中第一条自动成为今日焦点，置顶展示)"
+  ],
+  "ab": {
+   "baseline": {
+    "steps": "翻列表/逐条判断(N步)",
+    "pages": 1,
+    "decision": "用户自己全量决策"
+   },
+   "innovative": {
+    "steps": "看推荐/结论(1步)+执行",
+    "pages": 1,
+    "decision": "系统给决策建议, 用户执行"
+   }
+  },
+  "feasibility": "PARTIAL",
+  "causal": {},
+  "journey_slot": ""
+ }
+]

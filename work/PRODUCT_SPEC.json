@@ -1,0 +1,42 @@
+{
+ "user": {
+  "target": "需求方(见DEMAND原话)",
+  "core_task": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+  "scenario": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统。"
+ },
+ "core_value": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+ "core_flows": [
+  {
+   "id": "FLOW-CORE",
+   "family": "CORE",
+   "desc": "CORE 相关核心流程",
+   "source": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统"
+  }
+ ],
+ "features": [
+  {
+   "feature": "C-1:content",
+   "user_problem": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+   "value": "explicit需求约束，可验证",
+   "cost": "中",
+   "decision": "KEEP",
+   "reason": "核心流内约束，有可验证用户问题",
+   "source": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统"
+  },
+  {
+   "feature": "C-2:deliverable",
+   "user_problem": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+   "value": "explicit需求约束，可验证",
+   "cost": "中",
+   "decision": "KEEP",
+   "reason": "核心流内约束，有可验证用户问题",
+   "source": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统"
+  }
+ ],
+ "no_feature_list": [
+  "无(本次需求未含装饰性功能)"
+ ],
+ "open_questions": [],
+ "memory_applied": [],
+ "verdict": "OK"
+}

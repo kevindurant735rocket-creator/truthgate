@@ -1,0 +1,37 @@
+# truthgate's own gate, applied to truthgate's own repository.
+#
+# Used by CI to check that the tool can still verify itself. Every check here
+# must remain load-bearing: if one becomes constant-true, the build fails,
+# which is the point of shipping the gate on its own source.
+checks:
+  - name: package metadata present
+    type: file_exists
+    path: pyproject.toml
+    non_empty: true
+
+  - name: README documents the exit codes
+    type: file_contains
+    path: README.md
+    contains: "Exit codes"
+
+  - name: README states the honest limit of constant detection
+    type: file_contains
+    path: README.md
+    contains: "honest limit"
+
+  - name: MIT license present
+    type: file_exists
+    path: LICENSE
+    non_empty: true
+
+  - name: every core module is importable
+    type: command
+    run: python3 -c "import truthgate, truthgate.checks, truthgate.controls, truthgate.calibrate, truthgate.receipt, truthgate.cli"
+    expect_exit: 0
+
+  - name: a deliberately vacuous check is detected
+    # Self-referential: this repo proves its gate catches a constant-true
+    # assertion, using a check file that is checked in on purpose.
+    type: command
+    run: python3 -c "import sys, truthgate.cli; sys.exit(truthgate.cli.main(['verify','examples/vacuous.yaml','--no-receipt']))"
+    expect_exit: 4

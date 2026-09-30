@@ -1,0 +1,22 @@
+{
+ "journeys": [
+  {
+   "family": "CORE",
+   "prop": "P-1",
+   "steps": [
+    "START open / (http=200)",
+    "ACTION1 reach user (entry http 200)",
+    "ACTION2 do > 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使 -> expect named structures present in bundle: 验收清单文件 (family=CORE evidence=True literal=False)",
+    "RESULT reached",
+    "NEGATIVE n/a for CORE"
+   ],
+   "n_steps": 5,
+   "fail_at": null,
+   "guesses": [],
+   "recovery": "n/a",
+   "verdict": "PASS"
+  }
+ ],
+ "entry_http": 200,
+ "verdict": "PASS"
+}

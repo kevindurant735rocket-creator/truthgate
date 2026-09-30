@@ -1,0 +1,56 @@
+{
+ "stack": "python",
+ "spec_types": [
+  "content",
+  "deliverable"
+ ],
+ "flags": {
+  "persist_file": 0,
+  "search_real": 0,
+  "admin_protect": 0,
+  "state_guard": 0,
+  "isolation": 0,
+  "scheduler": 0,
+  "confirm_guard": 0,
+  "booking": 0,
+  "agg": 0,
+  "once_guard": 0,
+  "once_window": 0,
+  "deadline_guard": 0,
+  "accrual": 0,
+  "secret_hash": 0,
+  "health": 0
+ },
+ "generated": [
+  "outputs/bundle/app.py flags={\"accrual\": 0, \"admin_protect\": 0, \"agg\": 0, \"booking\": 0, \"confirm_guard\": 0, \"deadline_guard\": 0, \"health\": 0, \"isolation\": 0, \"once_guard\": 0, \"once_window\": 0, \"persist_file\": 0, \"scheduler\": 0, \"search_real\": 0, \"secret_hash\": 0, \"state_guard\": 0}",
+  "outputs/bundle/index.html (interactive scaffold)",
+  "outputs/bundle/index.html content-sections=1"
+ ],
+ "attempts": [
+  {
+   "n": 0,
+   "action": "smoke-existing",
+   "ok": false,
+   "evidence": "missing app.py"
+  },
+  {
+   "n": 1,
+   "action": "smoke-after-generate",
+   "ok": true,
+   "evidence": "GET / 200 body=406B api/list=200"
+  }
+ ],
+ "stack_detail": {
+  "stack": "python",
+  "pm": "none",
+  "testrunner": "none",
+  "entry": null,
+  "framework": "none",
+  "startcmd": null,
+  "file_roles": {}
+ },
+ "state_pairs": "template-default(created>paid>shipped); patch_agent refines from PROP",
+ "innovations_implemented": [],
+ "verdict": "BUILT",
+ "tasks_mapped": 2
+}

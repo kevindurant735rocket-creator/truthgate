@@ -1,0 +1,10 @@
+{
+ "score": 88,
+ "hard": [],
+ "warnings": [
+  "PASSWORD_FIELD_UNMASKED? (-5)",
+  "MISSING_LOADING_STATE (-4)",
+  "MISSING_DOCS ['README.md', 'RUNBOOK.md'] (-3)"
+ ],
+ "verdict": "OK"
+}

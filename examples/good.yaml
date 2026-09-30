@@ -1,0 +1,25 @@
+# A healthy check file: every check depends on something real, so all of them
+# survive their automatically derived negative controls.
+# Relative paths below resolve against the repository root, not examples/.
+root: ..
+
+checks:
+  - name: package metadata present
+    type: file_exists
+    path: pyproject.toml
+    non_empty: true
+
+  - name: the package declares a console entry point
+    type: file_contains
+    path: pyproject.toml
+    contains: "truthgate = "
+
+  - name: README documents the exit codes
+    type: file_contains
+    path: README.md
+    contains: "Exit codes"
+
+  - name: the version is importable and consistent
+    type: command
+    run: python3 -c "import truthgate; print(truthgate.__version__)"
+    expect_exit: 0

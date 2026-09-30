@@ -1,0 +1,1 @@
+PORT={{PORT}} python3 outputs/bundle/app.py

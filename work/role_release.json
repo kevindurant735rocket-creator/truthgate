@@ -1,0 +1,6 @@
+{
+ "role": "release_mgr",
+ "verdict": "APPROVE",
+ "builder": "builder-1",
+ "reviewer": "reviewer-1"
+}

@@ -1,0 +1,11 @@
+{
+ "roles": 1,
+ "permissions": 0,
+ "data_relations": 0,
+ "states": 0,
+ "external_deps": 0,
+ "workflow_steps": 2,
+ "score": 1,
+ "level": "SIMPLE",
+ "review_depth": "light"
+}

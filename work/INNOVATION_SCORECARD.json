@@ -1,0 +1,62 @@
+[
+ {
+  "id": "INN-01-empty-state-guidance",
+  "problem_fit": "high",
+  "differentiation": "medium",
+  "user_value": "high",
+  "simplicity": "high",
+  "feasibility": "FEASIBLE",
+  "verifiability": "high",
+  "verdict": "KEEP"
+ },
+ {
+  "id": "INN-02-inline-error-hint",
+  "problem_fit": "high",
+  "differentiation": "medium",
+  "user_value": "high",
+  "simplicity": "high",
+  "feasibility": "FEASIBLE",
+  "verifiability": "high",
+  "verdict": "KEEP"
+ },
+ {
+  "id": "INN-03-one-step-add",
+  "problem_fit": "high",
+  "differentiation": "medium",
+  "user_value": "high",
+  "simplicity": "high",
+  "feasibility": "FEASIBLE",
+  "verifiability": "high",
+  "verdict": "KEEP"
+ },
+ {
+  "id": "INN-04-stat-count-live",
+  "problem_fit": "high",
+  "differentiation": "medium",
+  "user_value": "medium",
+  "simplicity": "high",
+  "feasibility": "FEASIBLE",
+  "verifiability": "high",
+  "verdict": "REDESIGN"
+ },
+ {
+  "id": "INN-DESIGN-focused-next",
+  "problem_fit": "high",
+  "differentiation": "high",
+  "user_value": "medium",
+  "simplicity": "high",
+  "feasibility": "PARTIAL",
+  "verifiability": "high",
+  "verdict": "REDESIGN"
+ },
+ {
+  "id": "INN-OPEN-06",
+  "problem_fit": "high",
+  "differentiation": "medium",
+  "user_value": "medium",
+  "simplicity": "high",
+  "feasibility": "PARTIAL",
+  "verifiability": "medium",
+  "verdict": "REDESIGN"
+ }
+]

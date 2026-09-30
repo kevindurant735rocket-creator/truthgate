@@ -1,0 +1,39 @@
+{
+ "demand_hash": "ffb43a92eb691b9315f9089c02f981ce70414c5f703590e944a1bbb91eb3bac2",
+ "propositions": [
+  {
+   "source": "C-1",
+   "source_quote": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+   "constraint_type": "content",
+   "subject": "user",
+   "precondition": "page rendered",
+   "action": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使",
+   "expected": "named structures present in bundle: 验收清单文件",
+   "expected_state": "named structures present in bundle: 验收清单文件",
+   "negative": "named structure missing from bundle must BLOCK",
+   "negative_case": "named structure missing from bundle must BLOCK",
+   "boundary": "structures=验收清单文件",
+   "evidence": "V_content_structures",
+   "evidence_method": "V_content_structures",
+   "status": "pending",
+   "id": "P-1"
+  },
+  {
+   "source": "C-2",
+   "source_quote": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文件系统",
+   "constraint_type": "deliverable",
+   "subject": "user",
+   "precondition": "",
+   "action": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使",
+   "expected": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文",
+   "expected_state": "> 交付 truthgate 命令行工具，Python 编写，运行于 CPython 标准库环境，交付 README 使用说明与验收清单两个文件，行为限于本机文",
+   "negative": "",
+   "negative_case": "",
+   "boundary": "",
+   "evidence": "V_generic",
+   "evidence_method": "V_generic",
+   "status": "pending",
+   "id": "P-2"
+  }
+ ]
+}

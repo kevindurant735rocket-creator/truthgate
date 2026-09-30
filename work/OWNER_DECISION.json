@@ -1,0 +1,9 @@
+{
+ "goal": "SHIP_OK or honest BLOCK (fail-closed)",
+ "top_risk": "SAFE_MODE_ASSUMPTION: fuzzy demand built on minimal assumption, see decisions",
+ "next_action": "proceed release",
+ "stop_what": "stop review, no new info",
+ "rollback_layer": "PROCEED",
+ "reason": "no open failure",
+ "scope": "OK"
+}

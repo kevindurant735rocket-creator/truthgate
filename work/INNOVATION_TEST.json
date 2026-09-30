@@ -1,0 +1,23 @@
+[
+ {
+  "id": "INN-01-empty-state-guidance",
+  "idea": "empty-state-guidance(UX)：空状态直接告诉用户下一步做什么",
+  "method": "V_browser_interact",
+  "assert": "存在性+用户可完成+区别于baseline(baseline[空数据白屏/空白列表] → 本品[空状态直接告诉用户下一步做什么])+不破坏核心",
+  "status": "MAPPED"
+ },
+ {
+  "id": "INN-02-inline-error-hint",
+  "idea": "inline-error-hint(recovery)：原地红色提示，不丢已填内容",
+  "method": "journey",
+  "assert": "存在性+用户可完成+区别于baseline(baseline[错输入崩溃或静默失败] → 本品[原地红色提示，不丢已填内容])+不破坏核心",
+  "status": "MAPPED"
+ },
+ {
+  "id": "INN-03-one-step-add",
+  "idea": "one-step-add(workflow)：首屏单行输入回车即新增",
+  "method": "journey",
+  "assert": "存在性+用户可完成+区别于baseline(baseline[新增需跳页/开弹窗填多表] → 本品[首屏单行输入回车即新增])+不破坏核心",
+  "status": "MAPPED"
+ }
+]

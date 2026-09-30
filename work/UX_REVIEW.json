@@ -1,0 +1,20 @@
+{
+ "entry": "index.html",
+ "pages": 1,
+ "first_experience": "OK",
+ "journey": {
+  "flows": 1,
+  "note": "核心流动态证明以VERIFY为准"
+ },
+ "complexity": {
+  "pages": 1,
+  "flows": 1,
+  "verdict": "OK"
+ },
+ "warnings": [
+  "MISSING_EMPTY_STATE(advisory)",
+  "MISSING_LOADING_STATE(advisory)",
+  "MISSING_ERROR_STATE(advisory)"
+ ],
+ "verdict": "OK"
+}

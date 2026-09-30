@@ -1,0 +1,14 @@
+{
+ "results": [
+  {
+   "op": "M1_empty_index",
+   "status": "KILLED"
+  },
+  {
+   "op": "M2_strip_auth",
+   "status": "SURVIVED"
+  }
+ ],
+ "score": 0.5,
+ "verdict": "OK"
+}

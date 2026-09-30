@@ -1,0 +1,28 @@
+# A deliberately broken check file, used to demonstrate and to self-test the
+# constant-true detector. Running this is EXPECTED to exit 4:
+#
+#   $ truthgate verify examples/vacuous.yaml ; echo $?
+#   ... FAIL_CONSTANT ...
+#   4
+#
+# Every check below passes or fails regardless of what the repository actually
+# contains. They are the shapes that make real gates worthless while still
+# reporting a wall of green.
+
+# Relative paths below resolve against the repository root, not examples/.
+root: ..
+
+checks:
+  - name: matches any file at all
+    type: file_contains
+    path: pyproject.toml
+    regex: ".*"
+
+  - name: a file nobody ever creates
+    type: file_exists
+    path: this_path_is_never_created.txt
+
+  - name: checks for a string that is not there, forever
+    type: file_contains
+    path: pyproject.toml
+    contains: "this-string-is-absent"
