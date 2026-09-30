@@ -1,5 +1,0 @@
-{
- "rc_hash": "e1c0b90fcfde239584755c3e3eafc19fd9ef3e839f5d0d39b53ebd2769a31c9b",
- "frozen": true,
- "note": "RELEASE_FREEZE: no code change after this point; any mod must re-enter lifecycle"
-}

@@ -1,9 +1,0 @@
-{
- "role": "architect",
- "verdict": "OK",
- "findings": [
-  "LONG_LINES index.html x1",
-  "LONG_LINES app.py x1"
- ],
- "advisory": true
-}

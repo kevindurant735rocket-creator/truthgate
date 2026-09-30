@@ -13,3 +13,8 @@ venv/
 .coverage
 htmlcov/
 .DS_Store
+
+# company-delivery engine artefacts (local run ledger, not part of the tool)
+/work/
+/delivery/
+/outputs/

@@ -1,9 +1,0 @@
-{
- "pages_added": 0,
- "steps_added": 0,
- "settings_added": 0,
- "states_added": 0,
- "api_added": 0,
- "verdict": "PASS",
- "rule": "CORE全部零新页面/步骤/设置；任一条超标即REJECT（本轮无超标项）"
-}

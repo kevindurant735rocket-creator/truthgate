@@ -1,4 +1,0 @@
-{
- "strategy": "CREATE_MINIMAL",
- "reason": "empty bundle; builder authors minimal correct project from SPEC"
-}
