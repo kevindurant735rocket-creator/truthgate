@@ -128,8 +128,27 @@ truthgate verify truthgate.yaml
 
 ## 给闸门做校准
 
-给它带已知结果的样例，它给自己打分，报四个决定"能不能信这个门"的数字：
-Brier 分数、ECE、**假阳性率**（决定它能否安全地用于阻断）、恒真率。
+给它带已知结果的样例，它给自己打分：
+
+```json
+[
+  {"check": {"type": "file_contains", "path": "pyproject.toml", "contains": "name = "}, "known_pass": true},
+  {"check": {"type": "file_exists", "path": "README.md"}, "known_pass": false}
+]
+```
+
+```bash
+truthgate calibrate samples.json                    # 路径相对 samples.json 解析
+truthgate calibrate examples/samples.json --root .  # 路径相对仓库根解析
+truthgate calibrate samples.json --json              # 机器可读
+```
+
+它报四个决定"能不能信这个门"的数字：
+
+- **Brier 分数**——门的置信度与已知结果之间的平方误差。
+- **ECE**——置信度与实际通过率之间的偏离，按分箱计算。
+- **假阳性率**——本该失败的工作被放过多少次。这个数字决定你的门能否安全地用于阻断。
+- **恒真率**——你自己那些测不出失败的判据占比。
 
 ## 回执
 
