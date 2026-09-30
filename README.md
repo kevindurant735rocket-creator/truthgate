@@ -181,8 +181,9 @@ Give it samples with known outcomes and it scores itself:
 ```
 
 ```bash
-truthgate calibrate samples.json          # human-readable
-truthgate calibrate samples.json --json   # machine-readable
+truthgate calibrate samples.json            # paths resolve next to samples.json
+truthgate calibrate examples/samples.json --root .   # paths resolve against the repo root
+truthgate calibrate samples.json --json     # machine-readable
 ```
 
 It reports the four numbers that matter when you are deciding whether to trust a gate:

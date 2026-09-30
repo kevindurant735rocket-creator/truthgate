@@ -1,0 +1,22 @@
+[
+  {
+    "check": {"type": "file_contains", "path": "pyproject.toml", "contains": "name = "},
+    "known_pass": true
+  },
+  {
+    "check": {"type": "file_contains", "path": "pyproject.toml", "contains": "dependencies = []"},
+    "known_pass": true
+  },
+  {
+    "check": {"type": "file_exists", "path": "truthgate/controls.py"},
+    "known_pass": true
+  },
+  {
+    "check": {"type": "file_contains", "path": "pyproject.toml", "contains": "requests"},
+    "known_pass": false
+  },
+  {
+    "check": {"type": "file_exists", "path": "setup.py"},
+    "known_pass": false
+  }
+]
