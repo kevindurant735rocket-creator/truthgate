@@ -1,0 +1,115 @@
+name: README numbers
+
+# A number in a README rots quietly. "75 tests" stays true right up until
+# someone deletes three and forgets to edit the prose -- and the prose is the
+# only thing a visitor reads. This job re-derives every number the README
+# claims and fails when one no longer holds.
+#
+# The point is not to catch a wrong number once. It is to make the number
+# impossible to keep wrong: a PR that changes the test count without touching
+# the README fails here, which forces the sentence to be corrected in the
+# same commit that invalidated it.
+
+on:
+  schedule:
+    # Monday 06:17 UTC. An off-round minute on purpose: every scheduled job
+    # that fires at :00 piles onto the same runner-minute, and a weekly job
+    # has no reason to be one of the casualties.
+    - cron: "17 6 * * 1"
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  readme-numbers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Collect the real numbers
+        id: numbers
+        run: |
+          set -uo pipefail
+          pip install -q -e ".[dev]"
+
+          # NOT `pytest -q | grep "N passed"`: with -q already in addopts the
+          # summary line is suppressed entirely, so that grep matches nothing
+          # and the job fails forever on a repository whose tests are all
+          # green. junit xml is machine-readable and does not care how chatty
+          # pytest decides to be.
+          python -m pytest --junitxml=report.xml -q > /dev/null 2>&1 || true
+          # Parse the XML rather than grepping attributes: junit writes them
+          # in the order errors,failures,skipped,tests, so a grep written
+          # against the other order matches nothing -- and an empty match
+          # silently passes the "is the suite green" check below, which is
+          # the same shape of bug as a gate that reports success because it
+          # ran out of things to look at.
+          read -r tests notpassed < <(python - <<'PYEOF'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("report.xml").getroot()
+          suite = root if root.tag == "testsuite" else root[0]
+          n = int(suite.get("tests", 0))
+          bad = int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+          print(n, bad)
+          PYEOF
+          )
+          checks=$(grep -cE '^  - name:' selfcheck.yaml)
+          good_rc=0;  truthgate verify examples/good.yaml      --no-receipt >/dev/null 2>&1 || good_rc=$?
+          vac_rc=0;   truthgate verify examples/vacuous.yaml   --no-receipt >/dev/null 2>&1 || vac_rc=$?
+
+          {
+            echo "tests=${tests:-unknown}"
+            echo "notpassed=${passed:-0}"
+            echo "selfcheck_checks=${checks}"
+            echo "good_exit=${good_rc}"
+            echo "vacuous_exit=${vac_rc}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### README numbers, re-derived"
+            echo ""
+            echo "| claim | README says | this run |"
+            echo "|---|---|---|"
+            echo "| test count | 75 | ${tests} |"
+            echo "| \`examples/good.yaml\` exit | 0 | ${good_rc} |"
+            echo "| \`examples/vacuous.yaml\` exit | 4 | ${vac_rc} |"
+            echo "| selfcheck checks | ${checks} | ${checks} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if the README has drifted from reality
+        run: |
+          set -uo pipefail
+          bad=0
+          claim() { # claim <description> <expected> <actual>
+            if [ "$2" != "$3" ]; then
+              echo "::error::README claims $1 = $2, but this run measured $3"
+              bad=1
+            else
+              echo "ok: $1 = $3"
+            fi
+          }
+          claim "the test count"        "75" "${{ steps.numbers.outputs.tests }}"
+          if [ "${{ steps.numbers.outputs.notpassed }}" != "0" ]; then
+            echo "::error::the suite is not green (${{ steps.numbers.outputs.notpassed }} failure(s)/error(s))"
+            bad=1
+          fi
+          claim "good.yaml exit code"   "0"  "${{ steps.numbers.outputs.good_exit }}"
+          claim "vacuous.yaml exit code" "4" "${{ steps.numbers.outputs.vacuous_exit }}"
+
+          # The README states these in prose; grep the prose rather than
+          # trusting that they are still there at all.
+          if ! grep -qE '# [0-9]+ tests' README.md; then
+            echo "::error::README no longer states a test count -- add it back or update this job"
+            bad=1
+          fi
+          if ! grep -q 'honest limit' README.md; then
+            echo "::error::README lost its 'honest limit' section; that section is the trust"
+            bad=1
+          fi
+          exit $bad

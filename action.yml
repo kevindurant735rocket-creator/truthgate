@@ -1,0 +1,108 @@
+name: 'truthgate'
+description: 'Verify that a repository''s own checks can actually fail.'
+author: 'truthgate contributors'
+
+branding:
+  icon: 'shield-check'
+  color: 'purple'
+
+# NOTE ON FORMATTING: interpolation syntax must never appear inside an input
+# description. The description is read at parse time, and on a non-pull-request
+# event there is nothing to interpolate, so the parser errors out. Keep the
+# defaults in `default:` and the prose in `description:`, and say nothing of
+# the form "uses: owner/repo at the current ref".
+
+inputs:
+  spec:
+    description: 'Path to the check spec, relative to the workspace root.'
+    required: false
+    default: 'truthgate.yaml'
+  calibrate-samples:
+    description: 'JSON sample set for scoring the gate. Leave empty to skip calibration.'
+    required: false
+    default: ''
+  receipt:
+    description: 'Where to append the hash-chained receipt log. Leave empty to skip.'
+    required: false
+    default: '.truthgate/receipts.jsonl'
+  write-anchor:
+    description: 'Pin the chain head to this file, so a later check can detect entries deleted from the end of the log.'
+    required: false
+    default: ''
+  fail-on-unverified:
+    description: 'Fail when a check could not be evaluated. Exit 3 is not a pass.'
+    required: false
+    default: 'true'
+  comment:
+    description: 'Post the verdict as a pull-request comment.'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install truthgate
+      shell: bash
+      run: python -m pip install --upgrade pip && pip install "$GITHUB_ACTION_PATH"
+
+    - name: Verify the checks
+      id: gate
+      shell: bash
+      env:
+        SPEC: ${{ inputs.spec }}
+        RECEIPT: ${{ inputs.receipt }}
+        ANCHOR: ${{ inputs.write-anchor }}
+        FAIL_ON_UNVERIFIED: ${{ inputs.fail-on-unverified }}
+        SAMPLES: ${{ inputs.calibrate-samples }}
+      run: |
+        set -uo pipefail
+        args=(verify "$SPEC" --json)
+        [ -n "$RECEIPT" ] && args+=(--receipt "$RECEIPT")
+        [ -n "$ANCHOR" ] && args+=(--anchor "$ANCHOR")
+
+        # Exit 3 means "not proven".  A gate that is allowed to pass there
+        # reports success for a check it never managed to run, which is the
+        # failure this whole tool exists to prevent -- so the default is to
+        # fail, and the escape hatch has to be turned on deliberately.
+        rc=0
+        truthgate "${args[@]}" > verdict.json || rc=$?
+        echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+
+        cat verdict.json >> "$GITHUB_STEP_SUMMARY"
+
+        case "$rc" in
+          0) echo "::notice::truthgate: every check verified" ;;
+          2) echo "::error::truthgate: a check failed" ;;
+          3)
+            if [ "$FAIL_ON_UNVERIFIED" = "true" ]; then
+              echo "::error::truthgate: a check could not be evaluated (exit 3 is not a pass)"
+            else
+              echo "::warning::truthgate: a check could not be evaluated"
+            fi
+            ;;
+          4) echo "::error::truthgate: a constant-true check was caught; it cannot detect failure" ;;
+          *) echo "::error::truthgate: usage or internal error (exit $rc)" ;;
+        esac
+
+        if [ "$rc" -ne 0 ] && { [ "$rc" -ne 3 ] || [ "$FAIL_ON_UNVERIFIED" = "true" ]; }; then
+          exit 1
+        fi
+
+    - name: Score the gate against known outcomes
+      if: ${{ inputs.calibrate-samples != '' }}
+      shell: bash
+      env:
+        SAMPLES: ${{ inputs.calibrate-samples }}
+      run: |
+        set -uo pipefail
+        rc=0
+        truthgate calibrate "$SAMPLES" >> "$GITHUB_STEP_SUMMARY" || rc=$?
+        if [ "$rc" -ne 0 ]; then
+          echo "::error::truthgate calibrate: this gate should not be used to block anything"
+          exit 1
+        fi

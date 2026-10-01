@@ -21,6 +21,9 @@ truthgate reports the gate as worthless — because it is.
 
 **Zero dependencies. Python 3.9+. Nothing to install but the tool.**
 
+If this is the verification tool you wanted to exist, a star helps someone else find it — and
+I'll keep fixing the holes the red-team finds, as documented below.
+
 ---
 
 ## Why this exists
@@ -42,10 +45,39 @@ Concretely, three things it refuses to let a gate do:
 | Folds "couldn't run it" into pass or fail | Three states — `unverified` is its own answer, exit 3, never 0 |
 | Emits a boolean nobody has measured | `calibrate` reports Brier, ECE, false-positive rate, and constant rate |
 
+## Prove it in 30 seconds
+
+Do not take the numbers above on faith. Clone it and watch it catch a check that cannot fail:
+
+```bash
+git clone https://github.com/kevindurant735rocket-creator/truthgate && cd truthgate
+python3 -m truthgate.cli verify examples/vacuous.yaml ; echo "exit=$?"
+```
+
+`examples/vacuous.yaml` is three checks that pass or fail no matter what is in the repository.
+All three are reported `FAIL_CONSTANT` and the command exits `4`. Then watch it *not* fire on real
+checks, and see a broken gate score itself:
+
+```bash
+python3 -m truthgate.cli verify examples/good.yaml ; echo "exit=$?"     # 0, all verified
+python3 -m pytest -q                                                     # 75 tests
+```
+
+If any of those three numbers is wrong, the README is wrong. The test suite in particular contains
+checks that fail if the constant-true detector is ever neutered again — it was, twice, and both
+times the suite stayed green because the command tests only asserted the opposite property.
+
 ## Install
 
 ```bash
 pip install truthgate
+```
+
+Or from source, with no dependencies either way:
+
+```bash
+git clone https://github.com/kevindurant735rocket-creator/truthgate
+cd truthgate && python3 -m truthgate.cli --help
 ```
 
 From source (no dependencies either way):
