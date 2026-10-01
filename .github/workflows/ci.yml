@@ -41,6 +41,11 @@ jobs:
       - name: truthgate verifies its own README
         run: python -m truthgate.cli verify selfcheck.yaml
 
+      - name: README install instructions are executable
+        # The release check only proved the wheel builds. This one runs what
+        # the README tells a first-time visitor to run.
+        run: bash tools-check-install.sh
+
   build:
     runs-on: ubuntu-latest
     steps:
