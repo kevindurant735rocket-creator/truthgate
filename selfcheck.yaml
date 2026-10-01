@@ -19,6 +19,15 @@ checks:
     path: README.md
     contains: "honest limit"
 
+  - name: every install instruction in the README actually works
+    # v0.2.0 opened with `pip install truthgate` while nothing had been
+    # uploaded to PyPI, so the first command every visitor ran failed. The
+    # release check at the time only proved the wheel *built*, which is a
+    # different claim. This one runs the instructions.
+    type: command
+    run: bash tools-check-install.sh
+    expect_exit: 0
+
   - name: README documents what the controls refuse to judge
     # The limits above are the part most likely to be quietly deleted when
     # someone tidies the docs, and they are the part that keeps the tool

@@ -38,15 +38,31 @@ AI 编程工具的爆发带来了约 **18.7 万星**的评测与可观测工具�
 
 ## 安装
 
+目前唯一可用的路径是源码安装——只需要 Python，不需要任何第三方依赖：
+
 ```bash
-pip install truthgate
+git clone https://github.com/kevindurant735rocket-creator/truthgate
+cd truthgate
+python3 -m truthgate.cli --help
 ```
 
-源码运行（同样零依赖）：
+想把命令放进 PATH：
 
 ```bash
-git clone https://github.com/truthgate/truthgate && cd truthgate
-python3 -m truthgate.cli --help
+python3 -m pip install .
+```
+
+**PyPI 尚未发布**。这份 README 此前写的是 `pip install truthgate`，而那时包还不存在，
+实跑会报 `No matching distribution found`——说出来是因为，
+一份让你运行一条跑不通的指令的 README，比从不提这件事更糟。
+需要 wheel/sdist 可从 [v0.2.0 release](https://github.com/kevindurant735rocket-creator/truthgate/releases/tag/v0.2.0) 下载。
+
+在 GitHub Actions 里用本仓库自带的 action（它自己完成安装）：
+
+```yaml
+- uses: kevindurant735rocket-creator/truthgate@v0.2.0
+  with:
+    spec: truthgate.yaml
 ```
 
 ## 使用

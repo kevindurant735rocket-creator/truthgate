@@ -69,22 +69,33 @@ times the suite stayed green because the command tests only asserted the opposit
 
 ## Install
 
-```bash
-pip install truthgate
-```
-
-Or from source, with no dependencies either way:
+From source — this is the only path that works today, and it needs nothing but Python:
 
 ```bash
 git clone https://github.com/kevindurant735rocket-creator/truthgate
-cd truthgate && python3 -m truthgate.cli --help
+cd truthgate
+python3 -m truthgate.cli --help
 ```
 
-From source (no dependencies either way):
+truthgate has no third-party dependencies, so a checkout runs as-is. To put the command on your
+PATH:
 
 ```bash
-git clone https://github.com/truthgate/truthgate && cd truthgate
-python3 -m truthgate.cli --help
+python3 -m pip install .
+```
+
+PyPI is not published yet. This README said `pip install truthgate` before the package existed,
+which fails with *"No matching distribution found"* — worth stating plainly, because a README that
+tells you to run a command that does not work is worse than one that never mentioned it. Build
+artifacts are attached to the [v0.2.0 release](https://github.com/kevindurant735rocket-creator/truthgate/releases/tag/v0.2.0)
+if you would rather not clone.
+
+If you add it to a GitHub Actions workflow, the action in this repository does the install itself:
+
+```yaml
+- uses: kevindurant735rocket-creator/truthgate@v0.2.0
+  with:
+    spec: truthgate.yaml
 ```
 
 ## Use
