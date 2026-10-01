@@ -129,15 +129,26 @@ class CommandCheck(_BaseCheck):
                 cwd=str(root),
                 capture_output=True,
                 text=True,
+                # A command is free to print anything at all, in any encoding.
+                # `env` on a machine with a non-UTF-8 locale emits bytes that
+                # are not valid UTF-8, and strict decoding would turn a check
+                # that ran perfectly into a crash -- losing the exit code,
+                # which is the one thing we actually need.  The exit code is
+                # what decides the verdict; the output is only ever evidence,
+                # so replacing undecodable bytes costs nothing.
+                errors="replace",
                 timeout=timeout,
                 check=False,
             )
         except subprocess.TimeoutExpired:
-            return (
-                False,
-                f"command timed out after {timeout}s",
-                {"argv": argv, "timeout": timeout},
-            )
+            # A timeout is a statement about the machine, not about the work:
+            # we learned nothing about whether the assertion holds.  Reporting
+            # it as FAILED would mean "this check says the work is not done",
+            # which is a claim we cannot support.  It is UNVERIFIED, and the
+            # exit code reflects that we could not prove anything.
+            raise Unverifiable(
+                f"command did not finish within {timeout}s; its exit code is unknown"
+            ) from None
         except OSError as exc:
             raise Unverifiable(f"could not execute {program!r}: {exc}") from exc
 

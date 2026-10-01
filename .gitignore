@@ -18,3 +18,4 @@ htmlcov/
 /work/
 /delivery/
 /outputs/
+*.lock

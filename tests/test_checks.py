@@ -108,3 +108,65 @@ def test_miniyaml_strips_comments():
 def test_miniyaml_rejects_tab_indent():
     with pytest.raises(MiniYamlError):
         loads("a:\n\tb: 1")
+
+
+# --- regressions from the adversarial audit ---------------------------------
+
+
+def test_bare_yes_in_a_string_field_stays_a_string():
+    """`contains: yes` means the word "yes", not the boolean True.
+
+    Coercing it re-points the assertion at the literal "True", which then
+    passes -- a green gate on a check nobody wrote.
+    """
+    doc = loads(
+        """
+        checks:
+          - name: x
+            type: file_contains
+            path: a.txt
+            contains: yes
+        """
+    )
+    assert doc["checks"][0]["contains"] == "yes"
+
+
+def test_bare_no_still_works_for_boolean_fields():
+    doc = loads(
+        """
+        checks:
+          - name: x
+            type: file_exists
+            path: a.txt
+            enabled: no
+        """
+    )
+    assert doc["checks"][0]["enabled"] is False
+
+
+def test_bare_true_stays_a_string_in_run():
+    """`run: true` is the /usr/bin/true command, not a YAML boolean."""
+    doc = loads("checks:\n  - name: x\n    type: command\n    run: true\n")
+    assert doc["checks"][0]["run"] == "true"
+
+
+def test_duplicate_key_is_rejected():
+    """A silently overwritten key drops a check and still reports green."""
+    with pytest.raises(MiniYamlError, match="duplicate key"):
+        loads(
+            """
+            checks:
+              - name: a
+                type: file_exists
+                path: one.txt
+            checks:
+              - name: b
+                type: file_exists
+                path: two.txt
+            """
+        )
+
+
+def test_duplicate_field_within_one_check_is_rejected():
+    with pytest.raises(MiniYamlError, match="duplicate key"):
+        loads("checks:\n  - name: a\n    type: file_contains\n    path: f\n    contains: strict\n    contains: loose\n")

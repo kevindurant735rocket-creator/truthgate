@@ -15,6 +15,7 @@ system that oversells its guarantees is worse than none.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -65,25 +66,59 @@ def append(receipt_path: Path, record: dict[str, Any]) -> dict[str, Any]:
     and rename over the target.
     """
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    prev = last_hash(receipt_path)
-    entry = dict(record)
-    entry.setdefault("timestamp", _utc_now())
-    entry["prev_hash"] = prev
-    entry["hash"] = _chain_hash(prev, entry)
-    line = _canonical(entry) + "\n"
+    # The read-modify-write below is a lost update waiting to happen: two
+    # processes both read N lines, both chain onto line N, and the second
+    # os.replace silently discards the first one's line.  The chain would
+    # still verify -- it is internally consistent -- so the loss would be
+    # invisible while the caller had already been told "receipt appended".
+    # An exclusive lock makes the read and the replace one critical section.
+    lock_path = receipt_path.with_name(receipt_path.name + ".lock")
+    with open(lock_path, "a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            prev = last_hash(receipt_path)
+            entry = dict(record)
+            entry.setdefault("timestamp", _utc_now())
+            entry["prev_hash"] = prev
+            entry["hash"] = _chain_hash(prev, entry)
+            line = _canonical(entry) + "\n"
 
-    existing = receipt_path.read_text(encoding="utf-8") if receipt_path.is_file() else ""
-    tmp_fd, tmp_name = tempfile.mkstemp(dir=str(receipt_path.parent), prefix=".receipt-", suffix=".tmp")
-    try:
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
-            handle.write(existing)
-            handle.write(line)
-        os.replace(tmp_name, receipt_path)
-    except BaseException:
-        if os.path.exists(tmp_name):
-            os.unlink(tmp_name)
-        raise
+            existing = receipt_path.read_text(encoding="utf-8") if receipt_path.is_file() else ""
+            tmp_fd, tmp_name = tempfile.mkstemp(
+                dir=str(receipt_path.parent), prefix=".receipt-", suffix=".tmp"
+            )
+            try:
+                with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
+                    handle.write(existing)
+                    handle.write(line)
+                    handle.flush()
+                    # Without this the bytes can still be in the page cache
+                    # when the rename lands, and a crash loses a receipt that
+                    # was already reported as written.
+                    os.fsync(handle.fileno())
+                os.replace(tmp_name, receipt_path)
+                _fsync_dir(receipt_path.parent)
+            except BaseException:
+                if os.path.exists(tmp_name):
+                    os.unlink(tmp_name)
+                raise
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
     return entry
+
+
+def _fsync_dir(directory: Path) -> None:
+    """Persist a directory entry so a rename survives a crash."""
+    try:
+        fd = os.open(str(directory), os.O_RDONLY)
+    except OSError:  # pragma: no cover - not every platform allows this
+        return
+    try:
+        os.fsync(fd)
+    except OSError:  # pragma: no cover
+        pass
+    finally:
+        os.close(fd)
 
 
 def append_run(
@@ -108,10 +143,66 @@ def append_run(
     )
 
 
-def verify_chain(receipt_path: Path) -> tuple[bool, str]:
-    """Re-walk the chain; return (ok, human-readable reason)."""
+def write_anchor(receipt_path: Path, anchor_path: Path) -> dict[str, Any]:
+    """Record the chain's current head somewhere else.
+
+    A hash chain can prove nothing was edited *in the middle*: every line
+    still links.  It cannot, on its own, prove nothing was removed from the
+    *end* -- delete the last line and the remaining prefix is a perfectly
+    valid chain.  That is not a weakness of SHA-256; it is arithmetic, and no
+    amount of hashing inside the file fixes it, because the file is the only
+    thing being checked.
+
+    So the head has to be pinned somewhere the chain itself cannot reach.
+    Writing ``{count, head_hash}`` to a second file gives the check something
+    to compare against.  Keep that file out of the repository, or make it
+    append-only in CI, and truncating the log becomes detectable.
+    """
+    prev, count = GENESIS, 0
+    if receipt_path.is_file():
+        for line in receipt_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                break
+            prev = entry.get("hash", prev)
+            count += 1
+    anchor = {
+        "count": count,
+        "head_hash": prev,
+        "written_at": _utc_now(),
+        "receipt": str(receipt_path),
+    }
+    anchor_path.parent.mkdir(parents=True, exist_ok=True)
+    anchor_path.write_text(json.dumps(anchor, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return anchor
+
+
+def verify_chain(
+    receipt_path: Path,
+    *,
+    min_lines: int | None = None,
+    anchor_path: Path | None = None,
+) -> tuple[bool, str]:
+    """Re-walk the chain; return (ok, human-readable reason).
+
+    ``min_lines`` and ``anchor_path`` are the only ways to notice truncation
+    at the tail.  Without them this function can say "every line that is
+    present is intact" and nothing more -- so a log whose last run failed can
+    be shortened to its last green run and still verify clean.
+
+    A missing file is a *failure*, not a pass.  "No evidence" and "the
+    evidence is sound" are opposite answers, and returning True for the first
+    one let an empty log certify itself.
+    """
     if not receipt_path.is_file():
-        return True, "no receipt file yet"
+        return False, "no receipt file: there is no evidence to verify"
+    if min_lines is not None and receipt_path.stat().st_size == 0:
+        if min_lines > 0:
+            return False, f"receipt file is empty but at least {min_lines} line(s) were expected"
     prev = GENESIS
     count = 0
     for lineno, line in enumerate(receipt_path.read_text(encoding="utf-8").splitlines(), 1):
@@ -130,7 +221,28 @@ def verify_chain(receipt_path: Path) -> tuple[bool, str]:
             return False, f"line {lineno} has been altered since it was written"
         prev = entry["hash"]
         count += 1
+    if count == 0:
+        return False, "receipt file contains no entries: there is no evidence to verify"
+    if min_lines is not None and count < min_lines:
+        return False, (
+            f"chain is truncated: {count} line(s) present but at least {min_lines} expected; "
+            f"a tail deletion is invisible to a self-contained chain"
+        )
+    if anchor_path is not None:
+        if not anchor_path.is_file():
+            return False, f"anchor file not found: {anchor_path}"
+        try:
+            anchor = json.loads(anchor_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            return False, f"anchor file is not valid JSON: {exc}"
+        if anchor.get("count") != count:
+            return False, (
+                f"chain length {count} does not match the anchored length {anchor.get('count')}; "
+                f"entries have been removed since the anchor was written"
+            )
+        if anchor.get("head_hash") != prev:
+            return False, "chain head does not match the anchored head; the log has been rewritten"
     return True, f"{count} receipt line(s) verified"
 
 
-__all__ = ["GENESIS", "append", "append_run", "last_hash", "verify_chain"]
+__all__ = ["GENESIS", "append", "append_run", "last_hash", "verify_chain", "write_anchor"]

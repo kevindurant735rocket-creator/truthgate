@@ -19,6 +19,14 @@ checks:
     path: README.md
     contains: "honest limit"
 
+  - name: README documents what the controls refuse to judge
+    # The limits above are the part most likely to be quietly deleted when
+    # someone tidies the docs, and they are the part that keeps the tool
+    # honest. Make their presence a build requirement.
+    type: file_contains
+    path: README.md
+    contains: "What the controls refuse to judge"
+
   - name: MIT license present
     type: file_exists
     path: LICENSE

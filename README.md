@@ -138,6 +138,8 @@ UNVERIFIED  1 check(s) could not be evaluated. Exit 3 means 'not proven', which 
 
 An empty spec is refused outright (exit 1) rather than reported as "all verified" — zero checks
 proves nothing, and defaulting to green there is the most dangerous thing this tool could do.
+So is a spec whose every check is switched off with `enabled: false`; it is the same empty gate
+wearing a disguise, and it is rejected the same way.
 
 ## Automatic negative controls
 
@@ -169,6 +171,21 @@ A `regex: ".*"` check — the single most common vacuous assertion — is caught
 > the work. Deeper semantic verification is a different tool. This one tells you which of your
 > checks are load-bearing.
 
+### What the controls refuse to judge
+
+A control that cannot be built is reported **inconclusive**, never a pass. Concretely:
+
+| Situation | Why | Result |
+|---|---|---|
+| The check already fails in the real world | There is no passing behaviour to compare against | `inconclusive` — firing here would condemn every honest failing check |
+| The command reaches the network, uses `sh -c`, or an absolute path | A sandbox cannot isolate those, so an emptied world would be a sham | `inconclusive`, and the command is **not re-run** |
+| A `regex:` assertion is shaped like a negative one (`(?!`, `(?<!`) | "must not contain TODO" is satisfied by any text lacking TODO, so no counterexample exists | `inconclusive` rather than a false accusation |
+| One of the control worlds cannot be evaluated | We could not prove constancy either way | `inconclusive` |
+
+Only a control that can be *proven* to survive turns into `FAIL_CONSTANT`. The sound, if
+unexciting, position is that a check whose discrimination cannot be demonstrated has not been
+shown to be worthless.
+
 ## Calibrating the gate
 
 Give it samples with known outcomes and it scores itself:
@@ -186,12 +203,21 @@ truthgate calibrate examples/samples.json --root .   # paths resolve against the
 truthgate calibrate samples.json --json     # machine-readable
 ```
 
-It reports the four numbers that matter when you are deciding whether to trust a gate:
+It exits non-zero when the measured gate should not be used to block anything, so a CI job
+running `truthgate calibrate` cannot come back green next to a 100% false-positive rate.
+
+Numbers that were *not measured* say so. A rate with no samples in its denominator prints
+`n/a`, not `0.0%` — a fabricated zero is indistinguishable from a perfect score — and a run with
+fewer than three evaluated samples is labelled `LOW SAMPLE`.
+
+It reports the numbers that matter when you are deciding whether to trust a gate:
 
 - **Brier score** — squared error between the gate's confidence and the known outcome.
 - **ECE** — how far confidence sits from observed pass rates, in bins.
 - **False-positive rate** — how often the gate passed work that should have failed. The number that
   decides whether your gate is safe to block on.
+- **False-negative rate** — how often the gate failed work that was actually fine. Loud, but it
+  is the number that trains people to ignore failures.
 - **Constant rate** — the share of your own checks that cannot fail.
 
 ## Receipts
@@ -205,19 +231,46 @@ $ truthgate receipts
 .truthgate/receipts.jsonl: line 1 has been altered since it was written
 ```
 
-This proves the log wasn't quietly rewritten after the fact. It is not a signature scheme and
-doesn't pretend to be — it doesn't stop someone with write access from re-signing the whole chain.
+This proves the log wasn't quietly rewritten **in the middle**. It cannot, on its own, prove
+nothing was removed from the **end** — delete the last line and the remaining prefix is still a
+perfectly valid chain. That is arithmetic, not a bug: the file is the only thing being checked,
+so nothing inside it can testify about its own missing tail.
+
+So pin the head somewhere else. `truthgate verify --anchor .truthgate/anchor.json` records
+`{count, head_hash}`, and `truthgate receipts --anchor ...` then fails on a length or head
+mismatch:
+
+```
+$ truthgate receipts --anchor .truthgate/anchor.json
+chain length 1 does not match the anchored length 2; entries have been removed since the anchor was written
+```
+
+`--min-lines N` is the same idea without a second file. Keep the anchor out of the repository, or
+make it append-only in CI, and truncating the log becomes detectable. Neither mechanism is a
+signature scheme: neither stops someone with write access from rewriting both files.
+
+A missing receipt file is a **failure**, not a pass. "No evidence" and "the evidence is sound"
+are opposite answers, and an empty log must not certify itself.
 
 ## Development
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m pytest        # 38 tests
+.venv/bin/python -m pytest        # 75 tests
 ```
 
 The suite includes **mutation-style self-checks**: real constant-true checks that the detector must
 flag, and correct checks it must *not* flag. A control that never fires is worse than no control, so
 a detector that can't be fooled by a `regex: ".*"` fails the build.
+
+The command controls were written twice, both times because an independent adversarial pass found
+the first version was a tautology. The original substituted a stand-in command whose exit status was
+chosen to differ, so the two verdicts could never agree and it reported "caught" unconditionally —
+while `echo`, `true` and `sleep 0` sailed through. The second pass then found that `sh -c "exit 0"`
+and `./verify.sh` were equivalent escapes. Those regressions are now tests, and the reason the
+command control runs the *real* command in a *copy of your project with the data deleted* is
+exactly that: swapping the command, the expectation, or the path all turned out to be ways of not
+testing anything.
 
 ## License
 

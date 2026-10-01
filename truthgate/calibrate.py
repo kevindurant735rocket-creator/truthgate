@@ -52,6 +52,12 @@ CONF_FAILED = 0.0
 
 DEFAULT_ECE_BINS = 10
 
+#: Below this many graded samples the headline numbers describe the sample
+#: set, not the gate.  One sample that happens to go right scores a perfect
+#: Brier; reporting that without a warning is how a broken gate talks itself
+#: into looking trustworthy.
+MIN_SAMPLES = 3
+
 
 @dataclass
 class CalibrationSample:
@@ -83,6 +89,12 @@ class CalibrationReport:
     constant_count: int
     accuracy: float
     unverified: int
+    #: Denominators kept so a rate with an empty denominator can be reported
+    #: as "not measured" instead of as a fabricated 0%.
+    known_pass_count: int = 0
+    known_fail_count: int = 0
+    false_positive_count: int = 0
+    false_negative_count: int = 0
     bins: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -92,6 +104,9 @@ class CalibrationReport:
             "ece": self.ece,
             "false_positive_rate": self.false_positive,
             "false_negative_rate": self.false_negative,
+            "known_pass_count": self.known_pass_count,
+            "known_fail_count": self.known_fail_count,
+            "low_sample": self.low_sample,
             "constant_rate": self.constant_rate,
             "constant_count": self.constant_count,
             "accuracy": self.accuracy,
@@ -99,20 +114,50 @@ class CalibrationReport:
             "bins": self.bins,
         }
 
+    def _rate(self, numerator: int, denominator: int) -> str:
+        """A rate, or an honest 'not measured' when the denominator is empty.
+
+        Printing 0.0% for a rate with no samples in the denominator is a
+        fabricated measurement: it reads exactly like a perfect score and
+        hides the fact that nothing was tested.  A number that was not
+        measured has to look different from a number that was.
+        """
+        if denominator == 0:
+            return "n/a (no samples)"
+        return f"{numerator / denominator * 100:.1f}%"
+
+    @property
+    def low_sample(self) -> bool:
+        """Too few graded samples for the headline numbers to mean much."""
+        return self.n < MIN_SAMPLES
+
     def render(self) -> str:
         """Human-readable report, four headline numbers on four lines."""
-        def pct(x: float) -> str:
-            return f"{x * 100:.1f}%"
-
-        return "\n".join(
-            [
-                f"Brier score       : {self.brier:.4f}   (0 = perfect, 0.25 = always guess 0.5)  n={self.n}",
-                f"ECE               : {self.ece:.4f}   (expected calibration error, {DEFAULT_ECE_BINS} bins)",
-                f"False positive    : {pct(self.false_positive)}   ({pct(self.false_positive)} of "
-                f"known-fail samples were passed anyway)",
-                f"Constant checks   : {self.constant_count}/{self.n} ({pct(self.constant_rate)}) cannot discriminate",
-            ]
-        )
+        lines = [
+            f"Brier score       : {self.brier:.4f}   (0 = perfect, 0.25 = always guess 0.5)  n={self.n}",
+            f"ECE               : {self.ece:.4f}   (expected calibration error, {DEFAULT_ECE_BINS} bins)",
+            f"False positive    : {self._rate(self.false_positive_count, self.known_fail_count)}"
+            f"   ({self._rate(self.false_positive_count, self.known_fail_count)} of known-fail samples passed anyway)",
+            f"False negative    : {self._rate(self.false_negative_count, self.known_pass_count)}"
+            f"   ({self._rate(self.false_negative_count, self.known_pass_count)} of known-pass samples failed anyway)",
+            f"Constant checks   : {self.constant_count}/{self.n} ({self._rate(self.constant_count, self.n)}) cannot discriminate",
+        ]
+        warnings: list[str] = []
+        if self.low_sample:
+            warnings.append(
+                f"LOW SAMPLE: only {self.n} sample(s) could be evaluated "
+                f"(minimum {MIN_SAMPLES}); these numbers are not yet a measurement"
+            )
+        if self.unverified:
+            pct_unver = self.unverified / (self.unverified + self.n) * 100 if (self.unverified + self.n) else 0.0
+            warnings.append(
+                f"{self.unverified} sample(s) were UNVERIFIED and are excluded from every rate above "
+                f"({pct_unver:.1f}% of the set) - a gate that cannot run is not a gate that passed"
+            )
+        if warnings:
+            lines.append("")
+            lines.extend(f"  ! {w}" for w in warnings)
+        return "\n".join(lines)
 
 
 class CalibrationError(ValueError):
@@ -186,17 +231,11 @@ def compute_report(samples: list[CalibrationSample], n_bins: int = DEFAULT_ECE_B
     # False positive = gate said pass, truth says it should fail.  These are
     # the ones that let broken work through, so they get their own number.
     known_fail = [s for s in graded if not s.known_pass]
-    false_pos = (
-        sum(1 for s in known_fail if s.predicted_conf == CONF_VERIFIED) / len(known_fail)
-        if known_fail
-        else 0.0
-    )
+    fp_count = sum(1 for s in known_fail if s.predicted_conf == CONF_VERIFIED)
+    false_pos = fp_count / len(known_fail) if known_fail else 0.0
     known_pass = [s for s in graded if s.known_pass]
-    false_neg = (
-        sum(1 for s in known_pass if s.predicted_conf == CONF_FAILED) / len(known_pass)
-        if known_pass
-        else 0.0
-    )
+    fn_count = sum(1 for s in known_pass if s.predicted_conf == CONF_FAILED)
+    false_neg = fn_count / len(known_pass) if known_pass else 0.0
 
     constant_count = sum(1 for s in graded if s.constant)
     constant_rate = constant_count / n
@@ -214,6 +253,10 @@ def compute_report(samples: list[CalibrationSample], n_bins: int = DEFAULT_ECE_B
         constant_count=constant_count,
         accuracy=accuracy,
         unverified=len(samples) - n,
+        known_pass_count=len(known_pass),
+        known_fail_count=len(known_fail),
+        false_positive_count=fp_count,
+        false_negative_count=fn_count,
         bins=bins,
     )
 

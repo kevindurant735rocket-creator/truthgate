@@ -25,7 +25,7 @@ from .calibrate import CalibrationError, calibrate
 from .checks import CheckSpecError, evaluate_check, parse_spec, spec_root
 from .controls import find_constant_checks
 from .miniyaml import MiniYamlError, loads
-from .receipt import append_run, verify_chain
+from .receipt import append_run, verify_chain, write_anchor
 from .verdict import CheckResult, ExitCode, Verdict, rollup
 
 DEFAULT_SPEC = "truthgate.yaml"
@@ -87,12 +87,20 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
     enabled = [c for c in checks if c.get("enabled") is not False]
     disabled = len(checks) - len(enabled)
-    if not checks:
+    if not enabled:
         # An empty gate reporting "everything verified" is the single most
         # dangerous default this tool could have, so it is refused outright.
+        # The guard has to look at the *enabled* list, not the raw one: a spec
+        # whose every check is switched off has just as many proofs to offer as
+        # one that declares `checks: []`, and reporting either as a pass is a
+        # lie.  (Checking `checks` here let `enabled: false` on every line walk
+        # straight through the gate as "0 checks verified, exit 0".)
+        detail = (
+            "every check is disabled" if checks else "spec declares zero checks"
+        )
         print(
-            "truthgate: spec declares zero checks. An empty gate proves nothing; "
-            "it is refused rather than reported as all-verified.",
+            f"truthgate: {detail}. An empty gate proves nothing; "
+            f"it is refused rather than reported as all-verified.",
             file=sys.stderr,
         )
         return int(ExitCode.USAGE)
@@ -100,12 +108,22 @@ def cmd_verify(args: argparse.Namespace) -> int:
     results: list[CheckResult] = [evaluate_check(c, root) for c in enabled]
     findings, controls = find_constant_checks(enabled, root)
 
+    # Match findings to results by object identity, not by name.  Two checks
+    # may legitimately share a name (a spec assembled from fragments can),
+    # and matching on the string meant one constant check relabelled every
+    # check of that name -- overwriting a real UNVERIFIED verdict with
+    # FAIL_CONSTANT and destroying the evidence of what actually happened.
     for finding in findings:
-        for r in results:
-            if r.name == finding.name:
-                r.verdict = Verdict.FAIL_CONSTANT
-                r.detail = finding.detail
-                r.evidence["constant_control"] = finding.strategy
+        if not 0 <= finding.index < len(results):  # pragma: no cover - defensive
+            continue
+        target = results[finding.index]
+        # Keep what the check actually reported; the constant finding is
+        # additional information about it, not a replacement for it.
+        target.evidence["reported_verdict"] = target.verdict.value
+        target.evidence["reported_detail"] = target.detail
+        target.verdict = Verdict.FAIL_CONSTANT
+        target.detail = finding.detail
+        target.evidence["constant_control"] = finding.strategy
 
     exit_code = rollup(results)
 
@@ -143,11 +161,23 @@ def cmd_verify(args: argparse.Namespace) -> int:
                     [r.to_dict() for r in results],
                     [f.to_dict() for f in findings],
                 )
+                # Pin the head outside the log. Without this, deleting the
+                # last (failing) run leaves a chain that still verifies, and
+                # there is nothing inside the file that could tell the
+                # difference between "never failed" and "the failure was
+                # deleted".
+                if args.anchor:
+                    anchor_path = root / args.anchor
+                    write_anchor(receipt_path, anchor_path)
                 print(f"\nreceipt appended: {receipt_path}")
             except OSError as exc:
                 print(f"warning: could not write receipt: {exc}", file=sys.stderr)
 
-    _announce(exit_code, results, findings)
+    # In --json mode stdout must be parseable and nothing else: the closing
+    # summary went to stdout too, so `truthgate verify --json | jq` failed with
+    # "Extra data" on any run that found something to say.
+    if not args.json:
+        _announce(exit_code, results, findings)
     return exit_code
 
 
@@ -184,19 +214,72 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     except CalibrationError as exc:
         print(f"truthgate: {exc}", file=sys.stderr)
         return int(ExitCode.USAGE)
+    exit_code = _calibration_exit(report, as_json=args.json)
     if args.json:
-        print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+        payload = report.to_dict()
+        payload["verdict"] = "untrustworthy" if exit_code else "ok"
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         print(f"truthgate calibration  samples={samples}  root={root}")
         print(report.render())
-        if report.unverified:
-            print(f"  ({report.unverified} sample(s) were UNVERIFIED and are excluded from the rates)")
-    return int(ExitCode.OK)
+    return exit_code
+
+
+#: A gate that passes everything, or is mostly made of checks that cannot
+#: fail, is not a gate -- but `calibrate` used to exit 0 for it, so a CI job
+#: running this got a green tick next to a 100% false-positive rate. These
+#: thresholds are deliberately blunt: the point is that a visibly broken gate
+#: cannot report success, not that the number is a well-tuned parameter.
+MAX_FALSE_POSITIVE = 0.0
+MAX_FALSE_NEGATIVE = 0.0
+MAX_CONSTANT_RATE = 0.25
+#: More than this share of the sample set failing to evaluate means the
+#: remaining numbers describe a shrinking pile, not the gate.
+MAX_UNVERIFIED_SHARE = 0.5
+
+
+def _calibration_exit(report, *, as_json: bool = False) -> int:
+    """Exit non-zero when the measured gate should not be trusted."""
+    reasons: list[str] = []
+    if report.false_positive > MAX_FALSE_POSITIVE:
+        reasons.append(
+            f"it passed {report.false_positive_count}/{report.known_fail_count} known-fail samples"
+        )
+    if report.false_negative > MAX_FALSE_NEGATIVE:
+        reasons.append(
+            f"it failed {report.false_negative_count}/{report.known_pass_count} known-pass samples"
+        )
+    if report.constant_rate > MAX_CONSTANT_RATE:
+        reasons.append(
+            f"{report.constant_count}/{report.n} of its checks cannot discriminate"
+        )
+    if report.accuracy < 1.0 and (report.known_pass_count + report.known_fail_count) > 0:
+        wrong = report.known_pass_count + report.known_fail_count - round(
+            report.accuracy * (report.known_pass_count + report.known_fail_count)
+        )
+        reasons.append(f"it got {wrong} of {report.n} graded sample(s) wrong")
+    total = report.n + report.unverified
+    if total and report.unverified / total > MAX_UNVERIFIED_SHARE:
+        reasons.append(
+            f"{report.unverified} of {total} sample(s) could not be evaluated, so most of the "
+            f"numbers above rest on a minority of the set"
+        )
+    if not reasons:
+        return int(ExitCode.OK)
+    if not as_json:
+        # In --json mode stdout must stay parseable; the verdict travels in
+        # the payload instead, which the block below emits.
+        print(
+            f"\n{_paint('UNTRUSTWORTHY', '31')}  this gate should not be used to block anything: "
+            + "; ".join(reasons)
+        )
+    return int(ExitCode.FAILED)
 
 
 def cmd_receipts(args: argparse.Namespace) -> int:
     path = Path(args.path)
-    ok, reason = verify_chain(path)
+    anchor = Path(args.anchor) if args.anchor else None
+    ok, reason = verify_chain(path, min_lines=args.min_lines, anchor_path=anchor)
     print(f"{path}: {reason}")
     return int(ExitCode.OK) if ok else int(ExitCode.FAILED)
 
@@ -228,6 +311,14 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("-v", "--verbose", action="store_true", help="show detail for passing checks too")
     v.add_argument("--receipt", default=DEFAULT_RECEIPT, help="receipt log path, or 'none' to disable")
     v.add_argument("--no-receipt", action="store_true", help="do not write a receipt")
+    v.add_argument(
+        "--anchor",
+        default=None,
+        help=(
+            "also write {count, head_hash} to this file, so a later `truthgate receipts "
+            "--anchor` can detect entries deleted from the end of the log"
+        ),
+    )
     v.set_defaults(func=cmd_verify)
 
     c = sub.add_parser("calibrate", help="score the gate against a sample set with known outcomes")
@@ -238,6 +329,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     r = sub.add_parser("receipts", help="verify a receipt log's hash chain")
     r.add_argument("path", nargs="?", default=DEFAULT_RECEIPT, help="receipt log path")
+    r.add_argument(
+        "--min-lines",
+        type=int,
+        default=None,
+        help="fail if the log holds fewer lines than this (a tail deletion is invisible to the chain itself)",
+    )
+    r.add_argument(
+        "--anchor",
+        default=None,
+        help="compare against this anchor file and fail on a length or head mismatch",
+    )
     r.set_defaults(func=cmd_receipts)
 
     return parser
@@ -255,6 +357,12 @@ def main(argv: list[str] | None = None) -> int:
         return int(args.func(args))
     except KeyboardInterrupt:  # pragma: no cover
         return 130
+    except (CheckSpecError, MiniYamlError, CalibrationError) as exc:
+        # A malformed spec is the user's mistake, not a crash in the tool.
+        # Reporting it as "internal error" both mislabels the cause and
+        # hides which line of the spec needs fixing.
+        print(f"truthgate: {exc}", file=sys.stderr)
+        return int(ExitCode.USAGE)
     except Exception as exc:  # noqa: BLE001 - the CLI must not traceback at users
         print(f"truthgate: internal error: {exc}", file=sys.stderr)
         return int(ExitCode.USAGE)

@@ -96,9 +96,38 @@ def _unescape(raw: str) -> str:
     return "".join(out)
 
 
-def _scalar(token: str) -> Any:
-    """Convert a bare YAML scalar token into a Python value."""
+#: Keys whose values are *meant* to be booleans.  YAML 1.1 reads a bare
+#: `yes` / `no` / `on` / `off` as a boolean, and that is right for these.
+#: It is catastrophic for everything else: a check written as
+#: `contains: yes` means "the file must contain the word yes", and coercing
+#: it to the boolean True silently re-points the assertion at the literal
+#: string "True" -- which then passes, so the gate reports green on a check
+#: that was never asked.  Bare words stay strings unless the key says
+#: otherwise.
+_BOOL_KEYS = frozenset({"enabled", "non_empty", "known_pass"})
+
+#: Keys that must always be strings, even if they look boolean or numeric.
+#: The numeric fields (`expect_exit`, `timeout`) are deliberately absent: they
+#: are numbers, and holding them as strings would break every command check.
+_STRING_KEYS = frozenset(
+    {"name", "run", "path", "contains", "regex", "type", "root"}
+)
+
+
+def _scalar(token: str, key: str | None = None) -> Any:
+    """Convert a bare YAML scalar token into a Python value.
+
+    ``key`` is the field this scalar was written under, when known.  It
+    decides whether a bare `yes` becomes a boolean or stays the word, so
+    that `enabled: no` works while `contains: yes` still means the string.
+    """
     text = token.strip()
+    if key in _STRING_KEYS:
+        # Still honour explicit quoting and flow collections, but never
+        # reinterpret a bare word as a bool/number/null.
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+            return _unescape(text[1:-1]) if text[0] == '"' else text[1:-1].replace("''", "'")
+        return text
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         body = text[1:-1]
         return _unescape(body) if text[0] == '"' else body.replace("''", "'")
@@ -118,13 +147,21 @@ def _scalar(token: str) -> Any:
             k, v = part.split(":", 1)
             result[str(_scalar(k))] = _scalar(v)
         return result
+    # YAML 1.1 reads bare `yes` / `no` / `on` / `off` as booleans. That is
+    # correct for the handful of fields that *are* boolean, and a trap
+    # everywhere else: `contains: yes` means the word, and coercing it to
+    # True re-points the assertion at the literal string "True", which then
+    # passes -- a green gate on a check nobody wrote. So the bare-word
+    # treatment is opt-in by key.
+    if key in _BOOL_KEYS:
+        low = text.lower()
+        if low in _BOOL_TRUE:
+            return True
+        if low in _BOOL_FALSE:
+            return False
     low = text.lower()
     if low in _NULL:
         return None
-    if low in _BOOL_TRUE:
-        return True
-    if low in _BOOL_FALSE:
-        return False
     try:
         return int(text)
     except ValueError:
@@ -234,9 +271,19 @@ def _parse_mapping(lines: list[tuple[int, str]], start: int, indent: int) -> tup
         key = key.strip()
         if not key:
             raise MiniYamlError(f"empty key at line {i}: {text!r}")
+        if key in mapping:
+            # A repeated key silently replaces the earlier value, which for a
+            # check file means a dropped check or a quietly weakened
+            # assertion -- and the gate then reports green on a spec nobody
+            # wrote. Merging two `checks:` blocks is common enough in
+            # generated or CI-assembled files that guessing which one wins
+            # would be worse than stopping.
+            raise MiniYamlError(
+                f"duplicate key {key!r} at line {i}: a check file must not define the same field twice"
+            )
         rest = rest.strip()
         if rest:
-            mapping[key] = _scalar(rest)
+            mapping[key] = _scalar(rest, key)
             i += 1
             continue
         i += 1
